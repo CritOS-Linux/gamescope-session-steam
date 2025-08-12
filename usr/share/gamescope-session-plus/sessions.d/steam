@@ -1,12 +1,29 @@
-#! /bin/bash
+#!/usr/bin/bash
+
+function setup_custom_videos {
+    # Install CritOS's Steam Game Mode Startup & Suspend Videos
+    mkdir -p $HOME/.local/share/Steam/config/uioverrides/movies
+    if [ ! -f $HOME/.local/share/Steam/config/uioverrides/movies/deck_startup.webm ]; then
+        cp /usr/share/critos-data/critos.webm $HOME/.local/share/Steam/config/uioverrides/movies/deck_startup.webm
+    fi
+
+    if [ ! -f $HOME/.local/share/Steam/config/uioverrides/movies/deck-suspend-animation.webm ]; then
+        cp /usr/share/critos-data/critos-suspend.webm $HOME/.local/share/Steam/config/uioverrides/movies/deck-suspend-animation.webm
+    fi
+
+    if [ ! -f $HOME/.local/share/Steam/config/uioverrides/movies/deck-suspend-animation-from-throbber.webm ]; then
+        cp /usr/share/critos-data/critos-suspend.webm $HOME/.local/share/Steam/config/uioverrides/movies/deck-suspend-animation-from-throbber.webm
+    fi
+}
 
 function short_session_recover {
-    mkdir -p ~/.local/share/Steam
+    mkdir -p ~/.local/share
     # remove some caches and stateful things known to cause Steam to fail to start if corrupt
     rm -rf --one-file-system ~/.local/share/Steam/config/widevine
     # extract the steam bootstrap to potentially fix the issue the next boot
-    if [[ -f "/etc/first-boot/bootstraplinux_ubuntu12_32.tar.xz" ]]; then
-        tar xf /etc/first-boot/bootstraplinux_ubuntu12_32.tar.xz -C ~/.local/share/Steam
+    if [[ -f "/usr/share/gamescope-session-plus/bootstrap_steam.tar.gz" ]]; then
+        tar xf /usr/share/gamescope-session-plus/bootstrap_steam.tar.gz -C ~/.local/share
+        setup_custom_videos
     fi
     # change session to desktop as fallback
     steamos-session-select desktop
@@ -21,6 +38,9 @@ function post_gamescope_start {
 
 # Show VRR controls in Steam
 export STEAM_GAMESCOPE_VRR_SUPPORTED=1
+
+# When set to 1, a toggle will show up in the steamui to control whether dynamic refresh rate is applied to the steamui
+export STEAM_GAMESCOPE_DYNAMIC_REFRESH_IN_STEAM_SUPPORTED=0
 
 # Enable Mangoapp
 export STEAM_MANGOAPP_PRESETS_SUPPORTED=1
@@ -73,6 +93,9 @@ export STEAM_GAMESCOPE_NIS_SUPPORTED=1
 # Let steam know it can unmount drives without superuser privileges
 export STEAM_ALLOW_DRIVE_UNMOUNT=1
 
+# Allow formatting external drives
+export STEAM_ALLOW_DRIVE_ADOPT=1
+
 # We no longer need to set GAMESCOPE_EXTERNAL_OVERLAY from steam, mangoapp now does it itself
 export STEAM_DISABLE_MANGOAPP_ATOM_WORKAROUND=1
 
@@ -86,6 +109,9 @@ export STEAM_GAMESCOPE_FANCY_SCALING_SUPPORT=1
 export STEAM_GAMESCOPE_COLOR_MANAGED=1
 export STEAM_GAMESCOPE_VIRTUAL_WHITE=1
 
+# HDMI-CEC support
+export STEAM_ENABLE_CEC=0
+
 # Set input method modules for Qt/GTK that will show the Steam keyboard
 export QT_IM_MODULE=steam
 export GTK_IM_MODULE=Steam
@@ -97,14 +123,28 @@ fi
 
 export CURSOR_FILE="${HOME}/.local/share/Steam/tenfoot/resource/images/cursors/arrow.png"
 
+export XCURSOR_THEME=steam
+export XCURSOR_SCALE=256
+
+if command -v kwriteconfig6 >/dev/null; then
+  # Chromium (and therefore Steam) ignore XCursor and use on the GTK config
+  kwriteconfig6 --file gtk-3.0/settings.ini  --group Settings --key gtk-cursor-theme-name steam
+fi
+
+# HHD Support
+if ! /usr/libexec/valve-hardware; then
+    export SDL_GAMECONTROLLERCONFIG="060000000d0f00009601000000000000,Steam Controller (HHD),a:b0,b:b1,x:b2,y:b3,back:b6,guide:b8,start:b7,leftstick:b9,rightstick:b10,leftshoulder:b4,rightshoulder:b5,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a3,righty:a4,lefttrigger:a2,righttrigger:a5,paddle1:b13,paddle2:b12,paddle3:b15,paddle4:b14,misc2:b11,misc3:b16,misc4:b17,crc:ea35,"
+fi
+
 export CLIENTCMD="steam -gamepadui -steamos3 -steampal -steamdeck"
 
 # Workaround for Steam login issue while Steam client change propagates out of Beta
 touch "${HOME}"/.steam/root/config/SteamAppData.vdf || true
 
-if [[ -f "/etc/first-boot/bootstraplinux_ubuntu12_32.tar.xz" ]] && ! grep -q "set_bootstrap=1" "$STEAM_BOOTSTRAP_CONFIG"; then
-    mkdir -p ~/.local/share/Steam
-    tar xf /etc/first-boot/bootstraplinux_ubuntu12_32.tar.xz -C ~/.local/share/Steam
+if [[ -f "/usr/share/gamescope-session-plus/bootstrap_steam.tar.gz" ]] && ! grep -q "set_bootstrap=1" "$STEAM_BOOTSTRAP_CONFIG"; then
+    mkdir -p ~/.local/share
+    tar xf /usr/share/gamescope-session-plus/bootstrap_steam.tar.gz -C ~/.local/share
+    setup_custom_videos
     echo "set_bootstrap=1" >> "$STEAM_BOOTSTRAP_CONFIG"
 fi
 
